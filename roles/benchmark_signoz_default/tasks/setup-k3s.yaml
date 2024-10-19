@@ -1,0 +1,59 @@
+---
+- name: Add Signoz Helm Repo
+  kubernetes.core.helm_repository:
+    name: signoz
+    repo_url: https://charts.signoz.io
+    state: present
+
+- name: Copy Signoz values to tmp
+  template:
+    src: templates/signoz-values.yaml.j2
+    dest: /tmp/signoz-values.yaml
+
+- name: Install Signoz with Helm chart
+  kubernetes.core.helm:
+    chart_ref: signoz/signoz
+    chart_version: 0.52.0
+    release_name: signoz
+    release_namespace: signoz
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+    values_files:
+      - /tmp/signoz-values.yaml
+
+- name: Add signoz host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ signoz_host }}"
+    state: present
+
+- name: Add signoz ingest host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ signoz_ingest_host }}"
+    state: present
+
+- name: Add signoz query host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ signoz_query_host }}"
+    state: present
+
+- name: Pause 60s to allow Signoz to start
+  pause:
+    seconds: 120
+
+- name: Create Signoz User
+  uri:
+    url: "http://{{ signoz_query_host }}:{{ signoz_query_port }}/api/v1/register"
+    method: POST
+    body_format: json
+    return_content: yes
+    headers:
+      Content-Type: "application/json"
+    body:
+      email: "{{ signoz_username }}"
+      password: "{{ signoz_password }}"
+      name: Test
+      orgName: Test
+  register: signoz_user

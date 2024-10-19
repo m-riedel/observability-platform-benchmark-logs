@@ -1,0 +1,7 @@
+This codebase uses modified or copied code from the following sources:
+- https://github.com/k3s-io/k3s-ansible (Apache-2.0 License)
+    - roles/k3s_*/**
+    - k3s-reboot.yml
+    - k3s-upgrade.yml
+    - k3s-uninstall.yml
+    - k3s-setup.yml

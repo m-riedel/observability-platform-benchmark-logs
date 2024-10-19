@@ -1,0 +1,22 @@
+---
+- name: Run Opensearch Query
+  query_benchmark:
+    backend_type: opensearch
+    max_start: "{{ max_start }}"
+    max_end: "{{ max_end }}"
+    host: "{{ opensearch_host }}"
+    port: "{{ opensearch_port }}"
+    query_range: "{{ query_range }}"
+    protocol: http
+    opensearch_username: admin
+    opensearch_password: "{{ opensearch_password }}"
+    opensearch_index: "{{ opensearch_index }}"
+    runs_per_worker: "{{ item.runs_per_worker }}"
+    workers: "{{ item.workers }}"
+  register: benchmark_query_result
+  ignore_errors: yes
+
+- name: "Save {{ item.name }} query result"
+  ansible.builtin.template:
+    src: templates/benchmark-query-blank.json.j2
+    dest: "/var/benchmarks/opensearch_default_{{ run_num }}/benchmark-query-result_{{ item.name }}.json"

@@ -1,0 +1,83 @@
+---
+- name: Set Fluent-Bit Metrics Path
+  set_fact:
+    fluentbit_metrics_path: "/tmp/benchmarks/openobserve_default_{{ run_num }}/fluent-bit-metrics.json"
+    fluentbit_metrics_path_remote: "/var/benchmarks/openobserve_default_{{ run_num }}/fluent-bit-metrics.json"
+
+- name: Start Benchmark ingestion
+  ansible.builtin.include_role:
+    name: fluentbit
+  vars:
+    fluentbit_output_openobserve: true
+    fluentbit_output_openobserve_host: "{{ openobserve_host }}"
+    fluentbit_output_openobserve_port: "{{ openobserve_port }}"
+    fluentbit_output_openobserve_username: "{{ openobserve_username }}"
+    fluentbit_output_openobserve_password: "{{ openobserve_password }}"
+    fluentbit_output_openobserve_stream: "{{ openobserve_stream }}"
+    fluentbit_output_openobserve_org: "{{ openobserve_org }}"
+
+- name: Save start time
+  set_fact:
+    benchmark_ingestion_start: "{{ now() }}"
+
+- name: Pause to allow fluent bit to start properly
+  pause:
+    seconds: 10
+
+- name: Get Fluentbit Metrics
+  uri:
+    url: http://127.0.0.1:2020/api/v1/metrics
+    return_content: yes
+  register: fluentbit_metrics
+  until: (fluentbit_metrics | fluentbit_metrics_save_to_file(fluentbit_metrics_path)) or (fluentbit_metrics.json.output.openobserve_benchmark.proc_records | default(0) | int) == (total_lines | int) or (fluentbit_metrics_path | fluentbit_check_for_stuck_state("openobserve_benchmark"))
+  retries: 21600 # 6 Hours
+  delay: 1
+
+- name: Save Finished Time
+  set_fact:
+    benchmark_ingestion_end: "{{ now() }}"
+
+- name: Print ingestion End
+  debug:
+    msg: "{{ benchmark_ingestion_end }}"
+
+- name: Pause 15s to allow Fluentbit to finish
+  pause:
+    seconds: 15
+
+- name: Remove docker container
+  community.docker.docker_compose_v2:
+    project_src: /etc/fluent-bit
+    files:
+      - docker-compose.yaml
+    state: absent
+
+# The Values are inaccurate due to problems in aggregation of time. Rather look at ingested lines.
+- name: Verify Ingestion
+  uri:
+    url: "http://{{ openobserve_host }}:{{ openobserve_port }}/api/{{ openobserve_org }}/_search"
+    method: POST
+    headers:
+      Authorization: "Basic {{ (openobserve_username ~ ':' ~ openobserve_password) | b64encode }}"
+    body_format: json
+    body: "{ \"query\" : { \"sql\" : \"SELECT count(*) as num FROM {{ openobserve_stream }}\", \"start_time\" : {{(max_start | int // 1_000) | int - 2_000_000}}, \"end_time\" : {{ (max_end | int // 1_000) | int + 2_000_000  }}, \"from\" : 0 } }"
+    return_content: yes
+    timeout: 180
+  register: verify_ingestion
+  ignore_errors: true
+
+- name: Set ingested lines
+  set_fact:
+    ingested_lines: "{{ verify_ingestion.json.hits[0].num | default(0)}}"
+
+- name: Copy Fluent Bit Metrics to manager host
+  ansible.builtin.copy:
+    src: "{{ fluentbit_metrics_path }}"
+    dest: "{{ fluentbit_metrics_path_remote }}"
+    mode: 0755
+
+- name: Save Ingestion-Benchmark Result
+  ansible.builtin.template:
+    src: templates/benchmark-ingestion-data.json.j2
+    dest: "/var/benchmarks/openobserve_default_{{ run_num }}/benchmark-ingestion-result.json"
+

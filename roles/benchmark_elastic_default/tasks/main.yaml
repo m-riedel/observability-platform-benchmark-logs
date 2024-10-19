@@ -1,0 +1,22 @@
+---
+- name: Setup
+  import_tasks: setup.yaml
+
+- name: Ingestion Benchmark
+  import_tasks: benchmark-ingestion.yaml
+
+- name: Query Benchmark
+  include_tasks: benchmark-query.yaml
+  loop:
+    - name: 1x100
+      runs_per_worker: 100
+      workers: 1
+    - name: 10x100
+      runs_per_worker: 100
+      workers: 10
+    - name: 100x10
+      runs_per_worker: 10
+      workers: 100
+
+- name: Teardown
+  import_tasks: teardown.yaml

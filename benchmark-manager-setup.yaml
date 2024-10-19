@@ -1,0 +1,75 @@
+---
+- name: Setup Roles on benchmark-manager
+  hosts: benchmark-manager
+  become: true
+  roles:
+    - role: docker
+    - role: grafana
+    - role: kubectl
+    - role: helm
+
+- name: Install Prometheus
+  hosts: benchmark-manager
+  become: true
+  roles:
+    - role: prometheus.prometheus.prometheus
+  vars:
+    prometheus_scrape_configs: "{{ lookup('template', 'templates/prometheus-scrape-config.yaml.j2') | from_yaml }}"
+
+- name: Add default dashboard provision
+  hosts: benchmark-manager
+  become: yes
+  tasks:
+    - name: Copy dashboard provision file
+      copy:
+        src: files/grafana_dashboard_provision.yaml
+        dest: /etc/grafana/provisioning/dashboards/grafana_dashboard_provision.yaml
+        owner: grafana
+        group: grafana
+        mode: 0644
+    - name: Copy datasource provision file
+      copy:
+        src: files/grafana_datasource_provision.yaml
+        dest: /etc/grafana/provisioning/datasources/grafana_datasource_provision.yaml
+        owner: grafana
+        group: grafana
+        mode: 0644
+    - name: Create dashboard directory
+      file:
+        path: /var/lib/grafana/dashboards
+        state: directory
+        owner: grafana
+        group: grafana
+    - name: Copy dashboard file
+      copy:
+        src: files/dashboards/grafana_dashboard_1860_rev37.json
+        dest: /var/lib/grafana/dashboards/grafana_dashboard_1860_rev37.json
+        owner: grafana
+        group: grafana
+        mode: 0644
+    - name: Restart Grafana
+      systemd:
+        name: grafana-server
+        state: restarted
+    - name: Ensure pip is installed
+      apt:
+        name: python3-pip
+        state: present
+    - name: Install the elasticsearch python package globally
+      pip:
+        name: elasticsearch
+        break_system_packages: true
+        state: present
+      become: yes
+    - name: Install the kubernetes python package globally
+      pip:
+        name: kubernetes
+        break_system_packages: true
+        state: present
+      become: yes
+    - name: Install the opensearch python package globally
+      pip:
+        name: opensearch-py
+        break_system_packages: true
+        state: present
+      become: yes

@@ -1,0 +1,13 @@
+---
+- name: Remove Opensearch
+  kubernetes.core.helm:
+    state: absent
+    release_name: opensearch
+    release_namespace: opensearch
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Remove opensearch host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ opensearch_host }}"
+    state: absent

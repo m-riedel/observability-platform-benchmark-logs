@@ -1,0 +1,101 @@
+---
+- name: Set Fluent-Bit Metrics Path
+  set_fact:
+    fluentbit_metrics_path: "/tmp/benchmarks/signoz_default_{{ run_num }}/fluent-bit-metrics.json"
+    fluentbit_metrics_path_remote: "/var/benchmarks/signoz_default_{{ run_num }}/fluent-bit-metrics.json"
+
+- name: Start Benchmark ingestion
+  ansible.builtin.include_role:
+    name: fluentbit
+  vars:
+    fluentbit_output_signoz: true
+    fluentbit_output_signoz_host: "{{ hostvars['k3s-server1']['ansible_host'] }}"
+    fluentbit_output_signoz_port: "{{ signoz_fluent_forward_port }}"
+
+- name: Save start Time
+  set_fact:
+    benchmark_ingestion_start: "{{ now() }}"
+
+- name: Print ingestion Start
+  debug:
+    msg: "{{ benchmark_ingestion_start }}"
+
+- name: Pause to allow fluent bit to start properly
+  pause:
+    seconds: 10
+- name: Get Fluentbit Metrics
+  uri:
+    url: http://127.0.0.1:2020/api/v1/metrics
+    return_content: yes
+  register: fluentbit_metrics
+  until: (fluentbit_metrics | fluentbit_metrics_save_to_file(fluentbit_metrics_path)) or (fluentbit_metrics.json.output.signoz_benchmark.proc_records | default(0) | int) == (total_lines | int) or (fluentbit_metrics_path | fluentbit_check_for_stuck_state("signoz_benchmark"))
+  retries: 21600 # 6 Hours
+  delay: 1
+
+- name: Save Finished Time
+  set_fact:
+    benchmark_ingestion_end: "{{ now() }}"
+
+- name: Print ingestion End
+  debug:
+    msg: "{{ benchmark_ingestion_end }}"
+
+
+- name: Pause 15s to allow Fluentbit to finish
+  pause:
+    seconds: 15
+
+- name: Remove docker container
+  community.docker.docker_compose_v2:
+    project_src: /etc/fluent-bit
+    files:
+      - docker-compose.yaml
+    state: absent
+
+- name: Get access_token
+  uri:
+    url: "http://{{ signoz_query_host }}:{{ signoz_query_port }}/api/v1/login"
+    method: POST
+    timeout: 180
+    body_format: json
+    return_content: yes
+    headers:
+      Content-Type: "application/json"
+    body:
+      email: "{{ signoz_username }}"
+      password: "{{ signoz_password }}"
+  register: signoz_login
+
+- name: Save access_token
+  set_fact:
+    signoz_token: "{{ signoz_login.json.accessJwt }}"
+
+# The Values are inaccurate due to problems in aggregation of time. Rather look at ingested lines.
+- name: Verify Ingestion
+  register: verify_ingestion
+  ignore_errors: true
+  uri:
+    url: "http://{{ signoz_query_host }}:{{ signoz_query_port }}/api/v3/query_range"
+    method: POST
+    body_format: json
+    return_content: yes
+    headers:
+      Content-Type: "application/json"
+      Authorization: "Bearer {{ signoz_token }}"
+    timeout: 180
+    body: "{ \"start\": {{(max_start | int - 60_000_000_000) | int //1_000_000 }}, \"end\": {{ (max_start | int + 1_200_000_000_000) | int // 1_000_000 }}, \"step\": 60, \"variables\": {}, \"compositeQuery\": { \"queryType\": \"builder\", \"panelType\": \"graph\", \"fillGaps\": false, \"builderQueries\": { \"A\": { \"dataSource\": \"logs\", \"queryName\": \"A\", \"aggregateOperator\": \"count\", \"aggregateAttribute\": {   \"id\": \"------false\",   \"dataType\": \"\",   \"key\": \"\",   \"isColumn\": false,   \"type\": \"\",   \"isJSON\": false }, \"timeAggregation\": \"rate\", \"spaceAggregation\": \"sum\", \"functions\": [], \"filters\": { \"items\": [], \"op\": \"AND\" }, \"expression\": \"A\", \"disabled\": false, \"stepInterval\": 60, \"having\": [], \"limit\": null, \"orderBy\": [ {\"columnName\": \"timestamp\", \"order\": \"desc\" } ], \"groupBy\": [], \"legend\": \"\", \"reduceTo\": \"avg\" }}}}"
+
+- name: Register ingested logs
+  set_fact:
+    ingested_lines: "{{ (verify_ingestion.json.data.result[0].series[0]['values'] | map(attribute='value') | map('int') | sum) | default(0) }}"
+
+- name: Copy Fluent Bit Metrics to manager host
+  ansible.builtin.copy:
+    src: "{{ fluentbit_metrics_path }}"
+    dest: "{{ fluentbit_metrics_path_remote }}"
+    mode: 0755
+
+- name: Save Ingestion-Benchmark Result
+  ansible.builtin.template:
+    src: templates/benchmark-ingestion-data.json.j2
+    dest: "/var/benchmarks/signoz_default_{{ run_num }}/benchmark-ingestion-result.json"

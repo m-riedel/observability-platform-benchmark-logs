@@ -1,0 +1,17 @@
+---
+
+extraEnvs:
+  - name: OPENSEARCH_INITIAL_ADMIN_PASSWORD
+    value: {{ opensearch_password }}
+  - name: DISABLE_SECURITY_PLUGIN
+    value: "true"
+
+opensearchJavaOpts: "-Xmx4096M -Xms4096M"
+
+ingress:
+  enabled: true
+  ingressClassName: traefik
+  path: /
+  hosts:
+    - {{ opensearch_host }}
+  tls: []

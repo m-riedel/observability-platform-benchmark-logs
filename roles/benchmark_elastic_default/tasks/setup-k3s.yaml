@@ -1,0 +1,38 @@
+---
+- name: Add elastic Helm Repo
+  kubernetes.core.helm_repository:
+    name: elastic
+    repo_url: https://helm.elastic.co
+    state: present
+- name: Copy Elasticsearch values to tmp
+  template:
+    src: templates/elasticsearch-values.yaml.j2
+    dest: /tmp/elasticsearch-values.yaml
+
+- name: Install Elastic-Operator with Helm chart
+  kubernetes.core.helm:
+    chart_ref: elastic/eck-operator
+    release_name: elastic-operator
+    release_namespace: elastic-system
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+- name: Install Elasticsearch with Helm chart
+  kubernetes.core.helm:
+    chart_ref: elastic/eck-stack
+    chart_version: 0.12.1
+    release_name: elasticsearch
+    release_namespace: elasticsearch
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+    values_files:
+      - /tmp/elasticsearch-values.yaml
+
+- name: Add elasticsearch host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ elastic_host }}"
+    state: present
+
+- name: Pause 60s to allow Elasticsearch to start
+  pause:
+    seconds: 60

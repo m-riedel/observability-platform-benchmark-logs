@@ -1,0 +1,14 @@
+signoz_ingest_host: "ingest.signoz.benchmark.local"
+signoz_host: "signoz.benchmark.local"
+signoz_query_host: "query.signoz.benchmark.local"
+signoz_query_port: 80
+signoz_fluent_forward_port: 24224
+max_start: 0
+max_end: 0
+kubeconfig_path: "/etc/rancher/k3s/k3s.yaml"
+signoz_username: "benchmark@benchmark.local"
+signoz_password: "benchmark@benchmark.local"
+run_num: 0
+flog_sleep_in_us: 1
+# 1 hour in nanoseconds
+query_range: 30000000000

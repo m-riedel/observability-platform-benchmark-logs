@@ -1,0 +1,47 @@
+---
+- name: Analyze benchmark results
+  hosts: benchmark-manager
+  vars:
+    output_path: /var/benchmarks/results
+  become: true
+  tasks:
+    - name: Create output directory
+      file:
+        path: "{{ output_path }}"
+        state: directory
+    - name: Install numpy
+      pip:
+        name: numpy
+        break_system_packages: true
+        state: present
+    - name: Install matplotlib
+      pip:
+        name: matplotlib
+        break_system_packages: true
+        state: present
+    - name: Run analysis
+      analyze_benchmark:
+        base_path: /var/benchmarks
+        num_runs: 3
+        cfg_strs:
+          - "1x100"
+          - "10x100"
+          - "100x10"
+        backends:
+          - loki_default
+          - elastic_default
+          - opensearch_default
+          - openobserve_default
+          - signoz_default
+        output_path: "{{ output_path }}"
+    - name: Get all files to copy
+      find:
+        paths: "{{ output_path }}"
+        file_type: file
+      register: files_to_copy
+    - name: Copy results to local machine
+      fetch:
+        src: "{{ item.path }}"
+        dest: "results/"
+        flat: yes
+      with_items: "{{ files_to_copy.files }}"

@@ -1,0 +1,11 @@
+- job_name: 'benchmark-manager'
+  static_configs:
+    - targets:
+        - 'localhost:9100'
+- job_name: 'benchmark-nodes'
+  scrape_interval: 10s
+  static_configs:
+    - targets:
+      {% for host in groups[ 'k3s_cluster' ] %}
+      - "{{ hostvars[host]['ansible_host'] }}:9100"
+      {% endfor %}

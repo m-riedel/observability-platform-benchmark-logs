@@ -1,0 +1,29 @@
+---
+- name: Add grafana Helm Repo
+  kubernetes.core.helm_repository:
+    name: grafana
+    repo_url: https://grafana.github.io/helm-charts
+    state: present
+- name: Copy Loki values to tmp
+  copy:
+    content: "{{ lookup('template', 'templates/loki-values-' ~ deployment_mode ~ '.yaml.j2') }}"
+    dest: /tmp/loki-values.yaml
+- name: Install Loki with Helm chart
+  kubernetes.core.helm:
+    chart_ref: grafana/loki
+    chart_version: 6.12.0
+    release_name: loki
+    release_namespace: loki
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+    values_files:
+      - /tmp/loki-values.yaml
+- name: Add loki host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ loki_host }}"
+    state: present
+
+- name: Pause 30s to allow Loki to start
+  pause:
+    seconds: 30

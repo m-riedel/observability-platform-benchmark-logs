@@ -1,0 +1,13 @@
+---
+- name: Remove Openobserve
+  kubernetes.core.helm:
+    state: absent
+    release_name: openobserve
+    release_namespace: openobserve
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Remove openobserve host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ openobserve_host }}"
+    state: absent

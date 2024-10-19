@@ -1,0 +1,25 @@
+---
+- name: Install required System packages
+  apt:
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+- name: Download Docker GPG key
+  get_url:
+    url: https://download.docker.com/linux/debian/gpg
+    dest: /etc/apt/keyrings/docker.asc
+- name: Add Docker repository
+  apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian bookworm stable
+- name: Update APT cache
+  apt:
+    update_cache: yes
+- name: Install Docker
+  apt:
+    pkg:
+      - docker-ce
+      - docker-ce-cli
+      - containerd.io
+      - docker-buildx-plugin
+      - docker-compose-plugin

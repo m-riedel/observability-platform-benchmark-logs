@@ -1,0 +1,13 @@
+---
+- name: Remove Loki Helm Chart
+  kubernetes.core.helm:
+    release_name: loki
+    release_namespace: loki
+    state: absent
+    wait: true
+    kubeconfig: "{{ kubeconfig_path }}"
+- name: Remove loki host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ loki_host }}"
+    state: absent

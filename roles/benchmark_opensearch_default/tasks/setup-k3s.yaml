@@ -1,0 +1,32 @@
+---
+- name: Add Opensearch Helm Repo
+  kubernetes.core.helm_repository:
+    name: opensearch
+    repo_url: https://opensearch-project.github.io/helm-charts/
+    state: present
+
+- name: Copy Opensearch values to tmp
+  template:
+    src: templates/opensearch-values.yaml.j2
+    dest: /tmp/opensearch-values.yaml
+
+- name: Install Opensearch with Helm chart
+  kubernetes.core.helm:
+    chart_ref: opensearch/opensearch
+    chart_version: 2.24.0
+    release_name: opensearch
+    release_namespace: opensearch
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+    values_files:
+      - /tmp/opensearch-values.yaml
+
+- name: Add opensearch host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ opensearch_host }}"
+    state: present
+
+- name: Pause 60s to allow Opensearch to start
+  pause:
+    seconds: 60

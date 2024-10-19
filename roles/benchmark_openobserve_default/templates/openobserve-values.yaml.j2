@@ -1,0 +1,67 @@
+replicaCount:
+  ingester: 3
+  querier: 3
+  router: 3
+  compactor: 3
+  alertmanager: 0
+  zplane: 0
+
+auth:
+  ZO_ROOT_USER_EMAIL: {{ openobserve_username }}
+  ZO_ROOT_USER_PASSWORD: {{ openobserve_password }}
+
+config:
+  ZO_S3_PROVIDER: "minio"
+  ZO_COMPACT_FAST_MODE: false
+
+ingress:
+  enabled: true
+  className: traefik
+  annotations: {}
+  hosts:
+    - host: {{ openobserve_host }}
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  ingester:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 4
+      memory: 5000Mi
+  querier:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 4
+      memory: 5000Mi
+  compactor:
+    requests:
+      cpu: 100m
+      memory: 100Mi
+    limits:
+      cpu: 2
+      memory: 1100Mi
+
+minio:
+  enabled: true
+  replicas: 3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 2
+      memory: 2000Mi
+  persistence:
+    size: 20Gi
+
+postgres:
+  enabled: true
+  pgadmin:
+    enabled: false

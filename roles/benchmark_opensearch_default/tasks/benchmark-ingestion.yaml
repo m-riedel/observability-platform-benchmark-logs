@@ -1,0 +1,102 @@
+---
+- name: Set Fluent-Bit Metrics Path
+  set_fact:
+    fluentbit_metrics_path: "/tmp/benchmarks/opensearch_default_{{ run_num }}/fluent-bit-metrics.json"
+    fluentbit_metrics_path_remote: "/var/benchmarks/opensearch_default_{{ run_num }}/fluent-bit-metrics.json"
+
+- name: Start Benchmark ingestion
+  ansible.builtin.include_role:
+    name: fluentbit
+  vars:
+    fluentbit_output_opensearch: true
+    fluentbit_output_opensearch_host: "{{ opensearch_host }}"
+    fluentbit_output_opensearch_port: "{{ opensearch_port }}"
+    fluentbit_output_opensearch_index: "{{ opensearch_index }}"
+    fluentbit_output_opensearch_user: "admin"
+    fluentbit_output_opensearch_password: "{{ opensearch_password }}"
+
+- name: Save start Time
+  set_fact:
+    benchmark_ingestion_start: "{{ now() }}"
+
+- name: Print ingestion Start
+  debug:
+    msg: "{{ benchmark_ingestion_start }}"
+
+- name: Pause to allow fluent bit to start properly
+  pause:
+    seconds: 10
+
+- name: Get Fluentbit Metrics
+  uri:
+    url: http://127.0.0.1:2020/api/v1/metrics
+    return_content: yes
+  register: fluentbit_metrics
+  until: (fluentbit_metrics | fluentbit_metrics_save_to_file(fluentbit_metrics_path)) or ((fluentbit_metrics.json.output.os_benchmark.proc_records | default(0) | int) == (total_lines | int)) or (fluentbit_metrics_path | fluentbit_check_for_stuck_state("os_benchmark"))
+  retries: 21600 # 6 Hours
+  delay: 1
+
+- name: Abort when unhealthy ingestion
+  when: (fluentbit_metrics.json.output.os_benchmark.proc_records | default(0) | int) == 0
+  block:
+    - name: Output unhealthy benchmark error
+      debug:
+        msg: Unhealthy run!
+    - name: Print metrics
+      debug:
+        msg: "{{fluentbit_metrics}}"
+    - name: Remove docker container
+      community.docker.docker_compose_v2:
+        project_src: /etc/fluent-bit
+        files:
+          - docker-compose.yaml
+        state: absent
+    - name: Fail excecution
+      ansible.builtin.fail:
+        msg: The benchmarked system is not healthy.
+
+- name: Save Finished Time
+  set_fact:
+    benchmark_ingestion_end: "{{ now() }}"
+
+- name: Print ingestion End
+  debug:
+    msg: "{{ benchmark_ingestion_end }}"
+
+- name: Pause 15s to allow Fluentbit to finish
+  pause:
+    seconds: 15
+
+- name: Remove docker container
+  community.docker.docker_compose_v2:
+    project_src: /etc/fluent-bit
+    files:
+      - docker-compose.yaml
+    state: absent
+
+- name: Verify Ingestion
+  uri:
+    url: "http://{{ opensearch_host }}:{{ opensearch_port }}/{{ opensearch_index }}/_count"
+    url_username: admin
+    url_password: "{{ opensearch_password }}"
+    return_content: yes
+    timeout: 180
+  ignore_errors: true
+  register: verify_ingestion
+
+- name: Set ingested lines
+  set_fact:
+    ingested_lines: "{{ verify_ingestion.json.count | default(0) }}"
+
+- name: Copy Fluent Bit Metrics to manager host
+  ansible.builtin.copy:
+    src: "{{ fluentbit_metrics_path }}"
+    dest: "{{ fluentbit_metrics_path_remote }}"
+    mode: 0755
+
+- name: Save Ingestion-Benchmark Result
+  ansible.builtin.template:
+    src: templates/benchmark-ingestion-data.json.j2
+    dest: "/var/benchmarks/opensearch_default_{{ run_num }}/benchmark-ingestion-result.json"
+
+

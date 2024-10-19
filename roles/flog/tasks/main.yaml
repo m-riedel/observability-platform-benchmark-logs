@@ -1,0 +1,49 @@
+---
+- name: Check if docker is installed
+  command: docker --version
+  register: docker_version
+  ignore_errors: yes
+- name: Check if docker compose is installed
+  command: docker compose version
+  register: docker_compose_version
+  ignore_errors: yes
+- name: Install Docker if missing
+  ansible.builtin.include_role:
+    name: docker
+  when: docker_version.rc != 0 or docker_compose_version.rc != 0
+- name: Create directory for flog
+  file:
+    path: /etc/flog
+    state: directory
+- name: Copy flog docker compose template
+  ansible.builtin.template:
+    src: templates/docker-compose-flog.yaml.j2
+    dest: /etc/flog/docker-compose.yaml
+- name: Create Flog log target dir's
+  file:
+    path: "/var/log/benchmark/{{ item.format }}"
+    state: directory
+  with_items: "{{ flog_formats }}"
+- name: Start flog
+  community.docker.docker_compose_v2:
+    project_src: /etc/flog
+    files:
+      - docker-compose.yaml
+    pull: always
+- name: Wait for 15s for flog to finish
+  pause:
+    seconds: 15
+- name: Check if Containers are running
+  community.docker.docker_container_info:
+    name: "flog-{{ item.format }}"
+  register: flog_container_info
+  with_items: "{{ flog_formats }}"
+  retries: 100
+  delay: 30
+  until: flog_container_info.container.State.Running == false
+- name: Remove docker compose
+  community.docker.docker_compose_v2:
+    project_src: /etc/flog
+    files:
+      - docker-compose.yaml
+    state: absent

@@ -1,0 +1,37 @@
+---
+- name: Remove Signoz Helm Chart
+  kubernetes.core.helm:
+    state: absent
+    release_name: signoz
+    release_namespace: signoz
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Remove Clickhouse CRD
+  command: kubectl -n signoz patch clickhouseinstallations.clickhouse.altinity.com/signoz-clickhouse -p '{"metadata":{"finalizers":[]}}' --type=merge --kubeconfig {{ kubeconfig_path }}
+  ignore_errors: yes
+
+- name: Remove pvcs
+  command: kubectl -n platform delete pvc -l app.kubernetes.io/instance=signoz --kubeconfig {{ kubeconfig_path }}
+  ignore_errors: yes
+
+- name: Remove signoz namespace
+  command: kubectl delete namespace signoz --kubeconfig {{ kubeconfig_path }}
+  ignore_errors: yes
+
+- name: Remove signoz host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ signoz_host }}"
+    state: absent
+
+- name: Remove signoz ingest host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ signoz_ingest_host }}"
+    state: absent
+
+- name: Remove signoz query host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ signoz_query_host }}"
+    state: absent

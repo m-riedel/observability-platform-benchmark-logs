@@ -1,0 +1,21 @@
+---
+- name: Install required packages
+  apt:
+    pkg:
+      - apt-transport-https
+      - software-properties-common
+      - wget
+- name: Download Grafana GPG key
+  get_url:
+    url: https://apt.grafana.com/gpg.key
+    dest: /etc/apt/keyrings/grafana.asc
+- name: Add Grafana repository
+  apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/grafana.asc] https://packages.grafana.com/oss/deb stable main
+- name: Update APT cache
+  apt:
+    update_cache: yes
+- name: Install Grafana
+  apt:
+    pkg:
+      - grafana

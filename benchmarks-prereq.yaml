@@ -1,0 +1,44 @@
+---
+- import_playbook: k3s-uninstall.yaml
+- import_playbook: k3s-setup.yaml
+- name: Copy Local Kubeconfig to benchmark-manager
+  hosts: benchmark-manager
+  become: true
+  tasks:
+    - name: Create directory for kubeconfig
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+    - name: Copy kubeconfig to benchmark-manager
+      ansible.builtin.copy:
+        src: ~/.kube/config.new
+        dest: /etc/rancher/k3s/k3s.yaml
+
+- name: Flog prereq
+  hosts: benchmark-manager
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Set benchmark start time
+      set_fact:
+        benchmark_logs_time_start: "{{ (( now() ).strftime('%s') | int - 1200) | int * 1_000_000_000 }}"
+        cacheable: yes
+    - name: Remove existing flog logs
+      ansible.builtin.file:
+        path: /var/log/benchmark/apache_common
+        state: absent
+
+- name: Setup Flog
+  hosts: benchmark-manager
+  gather_facts: false
+  become: true
+  vars:
+    flog_formats:
+      - format: apache_common
+        type: log
+        bytes: "{{ ingest_bytes }}"
+        split_on_bytes: "{{ ingest_split_byterate }}"
+        time_between_logs: "{{ (flog_sleep_in_us | string) ~ 'us'}}"
+        time_start: "{{ '%Y-%m-%d %H:%M:%S.000000' | strftime((benchmark_logs_time_start | int // 1_000_000_000), utc=true )   }}"
+  roles:
+    - role: flog

@@ -1,0 +1,44 @@
+---
+- name: Retrieve Elasticsearch secret
+  kubernetes.core.k8s_info:
+    api_version: v1
+    kind: Secret
+    namespace: elasticsearch
+    name: elasticsearch-es-elastic-user
+    kubeconfig: "{{ kubeconfig_path }}"
+  register: secret_info
+
+- name: Decode Elasticsearch password from secret
+  set_fact:
+    elastic_password: "{{ secret_info.resources[0].data.elastic | b64decode }}"
+
+- name: Display Elasticsearch password
+  debug:
+    msg: "The Elasticsearch password is: {{ elastic_password }}"
+
+
+
+- name: Get all files to ingest
+  find:
+    paths: /var/log/benchmark/apache_common
+    file_type: file
+  register: files_to_ingest
+
+- name: Count lines in all files
+  shell: "wc -l {{ item.path }} | awk '{print $1}'"
+  with_items: "{{ files_to_ingest.files }}"
+  register: line_counts
+  when: files_to_ingest.matched > 0
+
+- name: Sum up the line counts
+  set_fact:
+    total_lines: "{{ line_counts.results | map(attribute='stdout') | map('int') | sum }}"
+
+- name: Print the total number of lines
+  debug:
+    msg: "Total number of lines in all files: {{ total_lines }}"
+
+
+- name: Calculate max_end
+  set_fact:
+    max_end: "{{((max_start | int + 60_000_000 | int + (flog_sleep_in_us | int * total_lines | int * 1_000)))}}"

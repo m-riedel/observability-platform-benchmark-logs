@@ -1,0 +1,10 @@
+---
+flog_formats:
+  - format: apache_common
+    type: log
+    # 1GB
+    bytes: 1000000000
+    # 100MB
+    split_on_bytes: 100000000
+    time_between_logs: 1us
+    time_start: "{{ now() }}"

@@ -1,0 +1,12 @@
+---
+loki_host: loki.benchmark.local
+loki_port: 80
+max_start: 0
+max_end: 0
+kubeconfig_path: /etc/rancher/k3s/k3s.yaml
+run_num: 0
+flog_sleep_in_us: 1
+loki_use_log_timestamps: false
+# 1 hour in nanoseconds
+query_range: 30000000000
+deployment_mode: simple-scalable

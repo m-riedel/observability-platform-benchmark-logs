@@ -1,0 +1,22 @@
+- name: Update Apt Cache
+  apt:
+    update_cache: yes
+- name: Install required packages
+  apt:
+    pkg:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+- name: Download Kubectl GPG Key
+  get_url:
+    url: https://pkgs.k8s.io/core:/stable:/v1.30/deb/Release.key
+    dest: /etc/apt/keyrings/kubernetes.asc
+- name: Add Kubectl Repository
+  apt_repository:
+    repo: deb [signed-by=/etc/apt/keyrings/kubernetes.asc] https://pkgs.k8s.io/core:/stable:/v1.30/deb/ /
+- name: Install Kubectl
+  apt:
+    pkg:
+      - kubectl
+    update_cache: yes

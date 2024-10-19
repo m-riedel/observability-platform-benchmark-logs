@@ -1,0 +1,14 @@
+---
+- import_playbook: node-setup.yaml
+- import_playbook: benchmark-manager-setup.yaml
+- import_playbook: benchmarks.yaml
+  vars:
+    run_num: 0
+- import_playbook: benchmarks.yaml
+  vars:
+    run_num: 1
+- import_playbook: benchmarks.yaml
+  vars:
+    run_num: 2
+
+- import_playbook: analyze.yaml

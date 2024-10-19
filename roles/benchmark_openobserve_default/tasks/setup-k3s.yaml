@@ -1,0 +1,64 @@
+---
+- name: Add Openobserve Helm Repo
+  kubernetes.core.helm_repository:
+    name: openobserve
+    repo_url: https://charts.openobserve.ai
+    state: present
+
+- name: Copy Openobserve values to tmp
+  template:
+    src: templates/openobserve-values.yaml.j2
+    dest: /tmp/openobserve-values.yaml
+
+- name: Apply Postgres CRD's
+  command: kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.23/releases/cnpg-1.23.1.yaml --kubeconfig {{ kubeconfig_path }}
+
+- name: Pause 30s to allow Postgres CRD's to apply
+  pause:
+    seconds: 60
+
+- name: Install Openobserve with Helm chart
+  kubernetes.core.helm:
+    chart_ref: openobserve/openobserve
+    chart_version: 0.11.3
+    release_name: openobserve
+    release_namespace: openobserve
+    create_namespace: true
+    kubeconfig: "{{ kubeconfig_path }}"
+    values_files:
+      - /tmp/openobserve-values.yaml
+
+- name: Add openobserve host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ openobserve_host }}"
+    state: present
+
+- name: Pause 30s to allow Openobserve to start
+  pause:
+    seconds: 30
+
+- name: Create Stream
+  uri:
+    url: http://{{ openobserve_host }}:{{ openobserve_port }}/api/{{ openobserve_org }}/streams/{{ openobserve_stream }}/settings?type=logs
+    method: POST
+    body_format: json
+    body:
+      partition_keys: []
+      full_text_search_keys: []
+      index_fields: []
+      bloom_filter_fields: []
+      data_retention: 14
+    headers:
+      Content-Type: "application/json"
+    url_password: "{{ openobserve_password }}"
+    url_username: "{{ openobserve_username }}"
+    force_basic_auth: true
+    #status_code: 200
+    return_content: yes
+  ignore_errors: yes
+  register: stream_creation
+
+- name: debug
+  debug:
+    var: stream_creation

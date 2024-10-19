@@ -1,0 +1,9 @@
+services:
+{% for flog_format in flog_formats %}
+  flog-{{ flog_format.format }}:
+    image: ghcr.io/m-riedel/eflog:latest
+    container_name: flog-{{ flog_format.format }}
+    volumes:
+      - /var/log/benchmark/{{ flog_format.format }}:/var/log/benchmark/{{ flog_format.format }}
+    entrypoint: flog -t {{ flog_format.type }} -f {{ flog_format.format }} -o /var/log/benchmark/{{ flog_format.format }}/benchmark-0.log -b {{ flog_format.bytes }} -p {{ flog_format.split_on_bytes }} -s {{ flog_format.time_between_logs }} -e "{{ flog_format.time_start }}" -r 0
+{% endfor %}

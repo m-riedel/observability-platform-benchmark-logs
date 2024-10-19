@@ -1,0 +1,22 @@
+---
+- name: "Run {{ item.name }} query"
+  query_benchmark:
+    backend_type: signoz
+    max_start: "{{ max_start }}"
+    max_end: "{{ max_end }}"
+    host: "{{ signoz_query_host }}"
+    port: "{{ signoz_query_port }}"
+    query_range: "{{ query_range }}"
+    signoz_username: "{{ signoz_username }}"
+    signoz_password: "{{ signoz_password }}"
+    signoz_init_user: true
+    protocol: http
+    runs_per_worker: "{{ item.runs_per_worker }}"
+    workers: "{{ item.workers }}"
+  register: benchmark_query_result
+  ignore_errors: yes
+
+- name: "Save {{ item.name }} query result"
+  ansible.builtin.template:
+    src: templates/benchmark-query-blank.json.j2
+    dest: "/var/benchmarks/signoz_default_{{ run_num }}/benchmark-query-result_{{ item.name }}.json"

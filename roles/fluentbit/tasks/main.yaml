@@ -1,0 +1,43 @@
+---
+- name: Check if docker is installed
+  command: docker --version
+  register: docker_version
+  ignore_errors: yes
+- name: Check if docker compose is installed
+  command: docker compose version
+  register: docker_compose_version
+  ignore_errors: yes
+- name: Install Docker if missing
+  ansible.builtin.include_role:
+    name: docker
+  when: docker_version.rc != 0 or docker_compose_version.rc != 0
+- name: Create directory for fluentbit
+  file:
+    path: /etc/fluent-bit
+    state: directory
+- name: Create directory for fluentbit config
+  file:
+    path: /etc/fluent-bit/config
+    state: directory
+- name: Template fluentbit config
+  ansible.builtin.template:
+    src: "templates/{{ item }}.j2"
+    dest: "/etc/fluent-bit/config/{{ item }}"
+  with_items:
+    - fluent-bit.conf
+- name: Copy Fluentbit configs
+  ansible.builtin.copy:
+    src: "files/{{ item }}"
+    dest: "/etc/fluent-bit/config/{{ item }}"
+  with_items:
+    - fluent-bit-parser.conf
+- name: Copy Docker-Compose File
+  ansible.builtin.template:
+    src: templates/docker-compose-fluent-bit.yaml.j2
+    dest: /etc/fluent-bit/docker-compose.yaml
+- name: Start fluentbit
+  community.docker.docker_compose_v2:
+    project_src: /etc/fluent-bit
+    files:
+      - docker-compose.yaml
+    pull: always

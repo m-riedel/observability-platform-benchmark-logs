@@ -1,0 +1,23 @@
+---
+- name: "Run {{ item.name }} query"
+  query_benchmark:
+    backend_type: openobserve
+    max_start: "{{ max_start }}"
+    max_end: "{{ max_end }}"
+    host: "{{ openobserve_host }}"
+    query_range: "{{ query_range }}"
+    port: "{{ openobserve_port }}"
+    protocol: http
+    openobserve_username: "{{ openobserve_username }}"
+    openobserve_password: "{{ openobserve_password }}"
+    openobserve_stream: "{{ openobserve_stream }}"
+    openobserve_org: "{{ openobserve_org }}"
+    runs_per_worker: "{{ item.runs_per_worker }}"
+    workers: "{{ item.workers }}"
+  register: benchmark_query_result
+  ignore_errors: yes
+
+- name: "Save {{ item.name }} query result"
+  ansible.builtin.template:
+    src: templates/benchmark-query-blank.json.j2
+    dest: "/var/benchmarks/openobserve_default_{{ run_num }}/benchmark-query-result_{{ item.name }}.json"

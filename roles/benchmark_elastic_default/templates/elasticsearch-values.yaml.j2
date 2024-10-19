@@ -1,0 +1,43 @@
+---
+
+eck-elasticsearch:
+    enabled: true
+
+    ingress:
+        enabled: true
+        pathType: Prefix
+        hosts:
+          - host: {{ elastic_host }}
+            path: "/"
+
+    nodeSets:
+      - name: default
+        count: 3
+        podTemplate:
+          spec:
+            containers:
+              - name: elasticsearch
+                resources:
+                  limits:
+                    cpu: 4
+                    memory: 8Gi
+                  requests:
+                    cpu: 2
+                    memory: 4Gi
+                volumeClaimTemplates:
+                  - metadata:
+                      name: elasticsearch-data
+                    spec:
+                      accessModes:
+                      - ReadWriteOnce
+                      resources:
+                        requests:
+                          storage: 20Gi
+
+    http:
+        tls:
+            selfSignedCertificate:
+                disabled: true
+
+eck-kibana:
+    enabled: false

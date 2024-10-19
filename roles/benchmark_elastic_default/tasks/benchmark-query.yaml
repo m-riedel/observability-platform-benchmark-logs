@@ -1,0 +1,22 @@
+---
+- name: "Run {{ item.name }} query"
+  query_benchmark:
+    backend_type: elasticsearch
+    max_start: "{{ max_start }}"
+    max_end: "{{ max_end }}"
+    query_range: "{{ query_range }}"
+    host: "{{ elastic_host }}"
+    port: "{{ elastic_port }}"
+    elastic_username: elastic
+    elastic_password: "{{ elastic_password }}"
+    elastic_index: "{{ elastic_index }}"
+    protocol: http
+    runs_per_worker: "{{ item.runs_per_worker }}"
+    workers: "{{ item.workers }}"
+  register: benchmark_query_result
+  ignore_errors: yes
+
+- name: "Save {{ item.name }} query result"
+  ansible.builtin.template:
+    src: templates/benchmark-query-blank.json.j2
+    dest: "/var/benchmarks/elastic_default_{{ run_num }}/benchmark-query-result_{{ item.name }}.json"

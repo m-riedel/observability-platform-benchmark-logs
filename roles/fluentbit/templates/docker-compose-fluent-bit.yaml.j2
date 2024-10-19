@@ -1,0 +1,15 @@
+services:
+  fluent-bit:
+    container_name: fluent-bit
+    image: cr.fluentbit.io/fluent/fluent-bit:3.1.9
+    restart: always
+    entrypoint: /fluent-bit/bin/fluent-bit -c /fluent-bit/etc/fluent-bit.conf -R /fluent-bit/etc/fluent-bit-parser.conf
+    volumes:
+      - /etc/fluent-bit/config:/fluent-bit/etc:ro
+      - /var/log/benchmark:/var/log/benchmark:ro
+    network_mode: host
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+          cpus: '3'

@@ -1,0 +1,80 @@
+---
+- import_playbook: benchmarks-prereq.yaml
+- name: Run Openobserve Default benchmark
+  hosts: benchmark-manager
+  become: true
+  roles:
+    - role: benchmark_openobserve_default
+      vars:
+        max_start: "{{ benchmark_logs_time_start }}"
+        query_range: "{{ benchmark_query_range }}"
+
+# Needed to increase the max virtual memory for the benchmarks of elasticsearch and opensearch.
+- name: Increase Max Virtual Memory
+  hosts: k3s_cluster
+  become: true
+  tasks:
+    - name: Add sysctl setting
+      lineinfile:
+        path: /etc/sysctl.conf
+        line: "vm.max_map_count=262144"
+        state: present
+    - name: Apply sysctl settings
+      command: sysctl -p
+
+- import_playbook: benchmarks-prereq.yaml
+- name: Run Opensearch Default benchmark
+  hosts: benchmark-manager
+  become: true
+  roles:
+    - role: benchmark_opensearch_default
+      vars:
+        max_start: "{{ benchmark_logs_time_start }}"
+        query_range: "{{ benchmark_query_range }}"
+
+- import_playbook: benchmarks-prereq.yaml
+- name: Run Elasticsearch Default benchmark
+  hosts: benchmark-manager
+  become: true
+  roles:
+    - role: benchmark_elastic_default
+      vars:
+        max_start: "{{ benchmark_logs_time_start }}"
+        query_range: "{{ benchmark_query_range }}"
+
+- name: Decrease Max Virtual Memory
+  hosts: k3s_cluster
+  become: true
+  tasks:
+    - name: Remove sysctl setting
+      lineinfile:
+        path: /etc/sysctl.conf
+        line: "vm.max_map_count=262144"
+        state: absent
+    - name: Apply sysctl settings
+      command: sysctl -p
+
+- import_playbook: benchmarks-prereq.yaml
+- name: Run Signoz Default benchmark
+  hosts: benchmark-manager
+  become: true
+  roles:
+    - role: benchmark_signoz_default
+      vars:
+        max_start: "{{ benchmark_logs_time_start }}"
+        query_range: "{{ benchmark_query_range }}"
+
+
+- import_playbook: benchmarks-prereq.yaml
+- name: Run Loki Default benchmark
+  hosts: benchmark-manager
+  gather_facts: false
+  become: true
+  roles:
+    - role: benchmark_loki_default
+      vars:
+        max_start: "{{ benchmark_logs_time_start }}"
+        query_range: "{{ benchmark_query_range }}"
+        loki_use_log_timestamps: true
+
+- import_playbook: benchmarks-prereq.yaml

@@ -1,0 +1,4 @@
+---
+api_port: 6443  # noqa var-naming[no-role-prefix]
+server_group: k3s_server  # noqa var-naming[no-role-prefix]
+agent_group: k3s_agent  # noqa var-naming[no-role-prefix]

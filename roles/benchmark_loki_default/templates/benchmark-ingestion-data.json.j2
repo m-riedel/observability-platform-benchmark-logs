@@ -1,0 +1,7 @@
+{
+    "benchmark_ingestion_start": "{{ benchmark_ingestion_start }}",
+    "benchmark_ingestion_end": "{{ benchmark_ingestion_end }}",
+    "total_lines": {{ total_lines }},
+    "ingested_lines": {{ ingested_lines }},
+    "final_metrics" : {{ fluentbit_metrics.json | tojson(indent=2) }}
+}

@@ -1,0 +1,94 @@
+[SERVICE]
+    HTTP_Server On
+    HTTP_Listen 0.0.0.0
+    HTTP_Port 2020
+    scheduler.base 3
+    scheduler.cap 5
+
+[INPUT]
+    Name tail
+    Tag benchmark
+    Path /var/log/benchmark/apache_common/*.log
+{% if not fluentbit_output_loki or fluentbit_output_loki_use_log_timestamps %}
+    Parser apache_time-only
+{%  endif %}
+    Alias tail_apache
+    Mem_Buf_Limit 1000MB
+    Read_from_Head On
+
+{% if fluentbit_output_loki %}
+[OUTPUT]
+    Name loki
+    Alias loki_benchmark
+    Labels job=fluentbit, $sub['stream']
+    Match benchmark
+    Host {{ fluentbit_output_loki_host }}
+    Port {{ fluentbit_output_loki_port }}
+    Uri /loki/api/v1/push
+    Retry_Limit False
+    Tls {{ fluentbit_output_loki_tls_enabled }}
+{% endif %}
+
+{% if fluentbit_output_elasticsearch %}
+[OUTPUT]
+    Name es
+    Alias es_benchmark
+    Match benchmark
+    Host {{ fluentbit_output_elasticsearch_host }}
+    Port {{ fluentbit_output_elasticsearch_port }}
+    HTTP_User {{ fluentbit_output_elasticsearch_user }}
+    HTTP_Passwd {{ fluentbit_output_elasticsearch_password }}
+    Index {{ fluentbit_output_elasticsearch_index }}
+    Suppress_Type_Name On
+    Retry_Limit False
+    Buffer_size False
+
+{% endif %}
+
+{% if fluentbit_output_opensearch %}
+[OUTPUT]
+    Name opensearch
+    Alias os_benchmark
+    Match benchmark
+    Host {{ fluentbit_output_opensearch_host }}
+    Port {{ fluentbit_output_opensearch_port }}
+    HTTP_User {{ fluentbit_output_opensearch_user }}
+    HTTP_Passwd {{ fluentbit_output_opensearch_password }}
+    Index {{ fluentbit_output_opensearch_index }}
+    Buffer_Size False
+    Retry_Limit False
+    Suppress_Type_Name On
+
+{% endif %}
+
+
+{% if fluentbit_output_signoz %}
+[OUTPUT]
+    Name forward
+    Alias signoz_benchmark
+    Match benchmark
+    Host {{ fluentbit_output_signoz_host }}
+    Port {{ fluentbit_output_signoz_port }}
+    Tls {{ fluentbit_output_signoz_tls_enabled }}
+    Retry_Limit False
+
+{% endif %}
+
+{% if fluentbit_output_openobserve %}
+[OUTPUT]
+    Name es
+    Alias openobserve_benchmark
+    Match benchmark
+    Path /api/{{ fluentbit_output_openobserve_org }}
+    Host {{ fluentbit_output_openobserve_host }}
+    index {{ fluentbit_output_openobserve_stream }}
+    Port {{ fluentbit_output_openobserve_port }}
+    tls {{ fluentbit_output_openobserve_tls_enabled }}
+    Suppress_Type_Name On
+    Generate_ID Off
+    HTTP_User {{ fluentbit_output_openobserve_username }}
+    HTTP_Passwd {{ fluentbit_output_openobserve_password }}
+    Retry_Limit False
+    Buffer_Size False
+
+{% endif %}

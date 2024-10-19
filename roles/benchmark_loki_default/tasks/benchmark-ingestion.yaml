@@ -1,0 +1,108 @@
+---
+- name: Set Fluent-Bit Metrics Path
+  set_fact:
+    fluentbit_metrics_path: "/tmp/benchmarks/loki_default_{{ run_num }}/fluent-bit-metrics.json"
+    fluentbit_metrics_path_remote: "/var/benchmarks/loki_default_{{ run_num }}/fluent-bit-metrics.json"
+
+- name: Start Benchmark ingestion
+  ansible.builtin.include_role:
+    name: fluentbit
+  vars:
+    fluentbit_output_loki: true
+    fluentbit_output_loki_host: "{{ loki_host }}"
+    fluentbit_output_loki_port: "{{ loki_port }}"
+    fluentbit_output_loki_tls_enabled: off
+    fluentbit_output_loki_use_log_timestamps: "{{ loki_use_log_timestamps }}"
+
+- name: Save start Time
+  set_fact:
+    benchmark_ingestion_start: "{{ now() }}"
+
+- name: Print ingestion Start
+  debug:
+    msg: "{{ benchmark_ingestion_start }}"
+
+
+- name: Pause to allow fluent bit to start properly
+  pause:
+    seconds: 10
+
+- name: Get Fluentbit Metrics
+  uri:
+    url: http://127.0.0.1:2020/api/v1/metrics
+    return_content: yes
+  register: fluentbit_metrics
+  until: (fluentbit_metrics | fluentbit_metrics_save_to_file(fluentbit_metrics_path)) or (fluentbit_metrics.json.output.loki_benchmark.proc_records | default(0) | int) == (total_lines | int) or (fluentbit_metrics_path | fluentbit_check_for_stuck_state("loki_benchmark"))
+  retries: 21600 # 6 Hours
+  delay: 1
+
+- name: Save Finished Time
+  set_fact:
+    benchmark_ingestion_end: "{{ now() }}"
+
+- name: Print ingestion End
+  debug:
+    msg: "{{ benchmark_ingestion_end }}"
+
+- name: Pause 15s to allow Fluentbit to finish
+  pause:
+    seconds: 15
+
+- name: Remove docker container
+  community.docker.docker_compose_v2:
+    project_src: /etc/fluent-bit
+    files:
+      - docker-compose.yaml
+    state: absent
+
+## Requesting from Loki results in a timeout error.
+#- name: Verify Loki Ingested Logs
+#  when: loki_use_log_timestamps == false
+#  uri:
+#    # Query: sum(count_over_time({job="fluentbit"}[5m]))
+#    url: "http://{{ loki_host }}:{{ loki_port }}/loki/api/v1/query_range?query=sum%28count_over_time%28%7Bjob%3D%22fluentbit%22%7D%5B5m%5D%29%29&start={{ (benchmark_ingestion_start | to_datetime('%Y-%m-%d %H:%M:%S.%f')).strftime('%s') | int * 1_000_000_000 }}&end={{ ((benchmark_ingestion_start | to_datetime('%Y-%m-%d %H:%M:%S.%f')).strftime('%s') | int * 1_000_000_000 ) | int + 1_200_000_000_000 }}&limit=1000&step=5m"
+#    method: GET
+#    timeout: 180
+#    return_content: yes
+#  ignore_errors: true
+#  register: loki_ingestion_result_no_timestamp
+#
+#- name: Verify Loki Ingested Logs
+#  when: loki_use_log_timestamps == true
+#  uri:
+#    # Query: sum(count_over_time({job="fluentbit"}[5m]))
+#    url: "http://{{ loki_host }}:{{ loki_port }}/loki/api/v1/query_range?query=sum%28count_over_time%28%7Bjob%3D%22fluentbit%22%7D%5B5m%5D%29%29&start={{ max_start | int - 1_200_000_000_000  }}&end={{ max_end | int + 1_200_000_000_000 }}&limit=1000&step=5m"
+#    method: GET
+#    timeout: 180
+#    return_content: yes
+#  ignore_errors: true
+#  register: loki_ingestion_result_with_timestamp
+#
+#- name: Debug response
+#  when: loki_use_log_timestamps == false
+#  debug:
+#    msg: "{{ loki_ingestion_result_no_timestamp }}"
+#
+#- name: Debug response
+#  when: loki_use_log_timestamps == true
+#  debug:
+#      msg: "{{ loki_ingestion_result_with_timestamp }}"
+#
+#- name: Register actual log count
+#  set_fact:
+#    ingested_lines: "{{ (loki_ingestion_result_no_timestamp.skipped | default(false)) | ternary((loki_ingestion_result_with_timestamp.json.data.result[0]['values'][0][1] | default(0) | int), (loki_ingestion_result_no_timestamp.json.data.result[0]['values'][0][1] | default(0) | int)) }}"
+
+- name: Set Log Count
+  set_fact:
+    ingested_lines: "{{fluentbit_metrics.json.output.loki_benchmark.proc_records | default(0) | int}}"
+
+- name: Copy Fluent Bit Metrics to manager host
+  ansible.builtin.copy:
+    src: "{{ fluentbit_metrics_path }}"
+    dest: "{{ fluentbit_metrics_path_remote }}"
+    mode: 0755
+
+- name: Save Ingestion-Benchmark Result
+  ansible.builtin.template:
+    src: templates/benchmark-ingestion-data.json.j2
+    dest: "/var/benchmarks/loki_default_{{ run_num }}/benchmark-ingestion-result.json"

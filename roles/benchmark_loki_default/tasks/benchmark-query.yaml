@@ -1,0 +1,39 @@
+---
+- name: "Run {{ item.name }} query"
+  when: loki_use_log_timestamps == true
+  query_benchmark:
+    backend_type: loki
+    max_start: "{{ max_start }}"
+    max_end: "{{ max_end }}"
+    query_range: "{{ query_range }}"
+    host: "{{ loki_host }}"
+    port: "{{ loki_port }}"
+    protocol: http
+    runs_per_worker: "{{ item.runs_per_worker }}"
+    workers: "{{ item.workers }}"
+  register: benchmark_query_result_with_timestamps
+  ignore_errors: yes
+
+- name: "Run {{ item.name }} query"
+  when: loki_use_log_timestamps == false
+  query_benchmark:
+    backend_type: loki
+    max_start: "{{ (benchmark_ingestion_start | to_datetime('%Y-%m-%d %H:%M:%S.%f')).strftime('%s') | int * 1_000_000_000 }}"
+    max_end: "{{ (benchmark_ingestion_end | to_datetime('%Y-%m-%d %H:%M:%S.%f')).strftime('%s') | int * 1_000_000_000  }} "
+    query_range: "{{ query_range }}"
+    host: "{{ loki_host }}"
+    port: "{{ loki_port }}"
+    protocol: http
+    runs_per_worker: "{{ item.runs_per_worker }}"
+    workers: "{{ item.workers }}"
+  register: benchmark_query_result_no_timestamps
+  ignore_errors: yes
+
+- name: Register actual query result
+  set_fact:
+    benchmark_query_result: "{{( benchmark_query_result_with_timestamps.skipped | default(false)) | ternary(benchmark_query_result_no_timestamps, benchmark_query_result_with_timestamps)}}"
+
+- name:  "Save {{ item.name }} query result"
+  ansible.builtin.template:
+    src: templates/benchmark-query-blank.json.j2
+    dest: "/var/benchmarks/loki_default_{{ run_num }}/benchmark-query-result_{{ item.name }}.json"

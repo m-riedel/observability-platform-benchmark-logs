@@ -1,0 +1,11 @@
+---
+- name: Setup Openobserve Cluster
+  import_tasks: setup-k3s.yaml
+
+- name: Create Benchmark Directory
+  file:
+    path: "/var/benchmarks/openobserve_default_{{ run_num }}"
+    state: directory
+
+- name: Setup metadata for ingestion benchmark
+  include_tasks: setup-ingest-meta.yaml

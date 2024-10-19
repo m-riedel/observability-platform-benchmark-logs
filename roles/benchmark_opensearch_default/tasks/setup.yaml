@@ -1,0 +1,25 @@
+---
+- name: Setup Opensearch Cluster
+  import_tasks: setup-k3s.yaml
+
+- name: Create Benchmark Directory
+  file:
+    path: "/var/benchmarks/opensearch_default_{{ run_num }}"
+    state: directory
+
+- name: Setup metadata for ingestion benchmark
+  include_tasks: setup-ingest-meta.yaml
+
+- name: Create Benchmark Index
+  uri:
+    url: "http://{{ opensearch_host }}:{{opensearch_port}}/{{opensearch_index}}"
+    method: PUT
+    status_code: 200
+    return_content: true
+    url_password: "{{ opensearch_password }}"
+    url_username: "admin"
+    body_format: json
+    headers:
+      Content-Type: "application/json"
+    body: "{\"settings\" : { \"index.number_of_replicas\" : 2}}"
+

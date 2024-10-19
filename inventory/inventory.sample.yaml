@@ -1,0 +1,40 @@
+---
+all:
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: /path/to/your/ssh/key.pem
+    ansible_port: 22
+    # now minus 20 Minutes
+    benchmark_logs_time_start: "{{ (( now() ).strftime('%s') | int - 1200) | int * 1000000000 }}"
+    # 10us -> 100_000 logs/s; 100us -> 10_000 logs/s
+    flog_sleep_in_us: 10
+    # 10 GB Total
+    ingest_bytes: 10_000_000_000
+    # Split file on every Gigabyte
+    ingest_split_byterate: 1_000_000_000
+    benchmark_query_range: 30_000_000_000 # 30 seconds
+  children:
+    benchmark_managers:
+      hosts:
+        benchmark-manager:
+          ansible_host: xxx.xxx.xxx.xxx
+    k3s_cluster:
+      vars:
+        k3s_version: v1.29.6+k3s2
+        token: "changeme!"
+        api_endpoint: "{{ hostvars[groups['k3s_server'][0]]['ansible_host'] | default(groups['k3s_server'][0]) }}"
+        extra_server_args: ""
+        extra_agent_args: ""
+        api_port: 6443
+      children:
+        k3s_server:
+          hosts:
+            k3s-server1:
+              ansible_host: xxx.xxx.xxx.xxx
+              extra_server_args: "--node-name k3s-server1 --tls-san k3s-server1"
+            k3s-server2:
+              ansible_host: xxx.xxx.xxx.xxx
+              extra_server_args: "--node-name k3s-server2 --tls-san k3s-server2"
+            k3s-server3:
+              ansible_host: xxx.xxx.xxx.xxx
+              extra_server_args: "--node-name k3s-server3 --tls-san k3s-server3"

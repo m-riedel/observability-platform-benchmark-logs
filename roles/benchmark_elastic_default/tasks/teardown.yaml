@@ -1,0 +1,22 @@
+---
+- name: Remove Elasticsearch Helm Chart
+  kubernetes.core.helm:
+    release_name: elasticsearch
+    release_namespace: elasticsearch
+    state: absent
+    wait: true
+    kubeconfig: "{{ kubeconfig_path }}"
+
+- name: Remove Elastic-Operator Helm Chart
+  kubernetes.core.helm:
+    release_name: elastic-operator
+    release_namespace: elastic-system
+    state: absent
+    kubeconfig: "{{ kubeconfig_path }}"
+    wait: true
+
+- name: Remove elasticsearch host to /etc/hosts
+  ansible.builtin.lineinfile:
+    dest: /etc/hosts
+    line: "{{ hostvars['k3s-server1']['ansible_host'] }} {{ elastic_host }}"
+    state: absent

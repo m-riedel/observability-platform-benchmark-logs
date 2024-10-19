@@ -1,0 +1,8 @@
+---
+collections:
+  - name: community.general
+  - name: ansible.posix
+  - name: grafana.grafana
+  - name: prometheus.prometheus
+  - name: kubernetes.core
+  - name: community.docker
